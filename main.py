@@ -1,9 +1,9 @@
+import yaml
 import json
 import requests
 
-
 class BegetAPI:
-    def __init__(self, login, password):
+    def __init__(self, config_path="config.yml"):
         self.base_url = "https://api.beget.com/v1"
         self.auth_url = f"{self.base_url}/auth"
         self.server_list_url = f"{self.base_url}/vps/server/list"
@@ -11,9 +11,14 @@ class BegetAPI:
             "Accept": "application/json",
             "Content-Type": "application/json"
         }
-        self.login = login
-        self.password = password
         self.jwt_token = None
+        self.load_config(config_path)
+
+    def load_config(self, config_path):
+        with open(config_path, "r") as config_file:
+            config_data = yaml.safe_load(config_file)
+            self.login = config_data["beget"]["login"]
+            self.password = config_data["beget"]["password"]
 
     def authenticate(self):
         auth_data = {
@@ -37,7 +42,6 @@ class BegetAPI:
         response = requests.get(self.server_list_url, headers=headers_with_auth)
         return response.json().get("vps")
 
-
 class VPS:
     def __init__(self, vps_data):
         self.vps_id = vps_data.get("id")
@@ -59,10 +63,9 @@ class VPS:
               f"----------------------------\n"
               )
 
-
 # Пример использования
 if __name__ == "__main__":
-    beget_api = BegetAPI(login="", password="")
+    beget_api = BegetAPI()
     vps_list = beget_api.get_vps_list()
 
     for vps_data in vps_list:
