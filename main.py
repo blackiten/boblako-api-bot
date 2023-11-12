@@ -1,51 +1,73 @@
+import yaml
 import json
 import requests
 
-url = "https://api.beget.com/v1/auth"
+class BegetAPI:
+    def __init__(self, config_path="config.yml"):
+        self.base_url = "https://api.beget.com/v1"
+        self.auth_url = f"{self.base_url}/auth"
+        self.server_list_url = f"{self.base_url}/vps/server/list"
+        self.headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        self.jwt_token = None
+        self.load_config(config_path)
 
-headers = {
-    "Accept": "application/json",
-    "Content-Type": "application/json"
-}
+    def load_config(self, config_path):
+        with open(config_path, "r") as config_file:
+            config_data = yaml.safe_load(config_file)
+            self.login = config_data["beget"]["login"]
+            self.password = config_data["beget"]["password"]
 
-data = {
-    "login": "login",
-    "password": "password",
-    "saveMe": True
-}
+    def authenticate(self):
+        auth_data = {
+            "login": self.login,
+            "password": self.password,
+            "saveMe": True
+        }
+        response = requests.post(self.auth_url, headers=self.headers, data=json.dumps(auth_data))
+        response_data = response.json()
+        self.jwt_token = response_data.get("token")
 
-response = requests.post(url, headers=headers, data=json.dumps(data))
-response_data = response.json()
-jwtToken = response_data.get("token")
+    def get_vps_list(self):
+        if not self.jwt_token:
+            self.authenticate()
 
-url = "https://api.beget.com/v1/vps/server/list"
-headers = {
-    "Accept": "application/json",
-    "Authorization": f"Bearer {jwtToken}"
-}
+        headers_with_auth = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.jwt_token}"
+        }
 
-response = requests.get(url, headers=headers)
+        response = requests.get(self.server_list_url, headers=headers_with_auth)
+        return response.json().get("vps")
 
-vpsList = response.json().get("vps")
+class VPS:
+    def __init__(self, vps_data):
+        self.vps_id = vps_data.get("id")
+        self.vps_ip = vps_data.get("ip_address")
+        self.vps_configuration = vps_data.get("configuration")
+        self.vps_cpu_count = self.vps_configuration.get("cpu_count")
+        self.vps_disk_size = self.vps_configuration.get("disk_size")
+        self.vps_memory = self.vps_configuration.get("memory")
+        self.vps_status = vps_data.get("status")
 
-for vps in vpsList:
-    vps_id = vps.get("id")
-    vps_ip = vps.get("ip_address")
+    def display_info(self):
+        print(f"id: {self.vps_id}\n"
+              f"----------------------------\n"
+              f"status: {self.vps_status}\n"
+              f"ip: {self.vps_ip}\n"
+              f"cpu count: {self.vps_cpu_count}\n"
+              f"disk size: {self.vps_disk_size}\n"
+              f"memory: {self.vps_memory}\n"
+              f"----------------------------\n"
+              )
 
-    vps_configuration = vps.get("configuration")
+# Пример использования
+if __name__ == "__main__":
+    beget_api = BegetAPI()
+    vps_list = beget_api.get_vps_list()
 
-    vps_cpu_count = vps_configuration.get("cpu_count")
-    vps_disk_size = vps_configuration.get("disk_size")
-    vps_memory = vps_configuration.get("memory")
-
-    vps_status = vps.get("status")
-
-    print(f"id: {vps_id}\n"
-          f"----------------------------\n"
-          f"status: {vps_status}\n"
-          f"ip: {vps_ip}\n"
-          f"cpu count: {vps_cpu_count}\n"
-          f"disk size: {vps_disk_size}\n"
-          f"memory: {vps_memory}\n"
-          f"----------------------------\n"
-          )
+    for vps_data in vps_list:
+        vps_instance = VPS(vps_data)
+        vps_instance.display_info()
